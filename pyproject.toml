@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wattly"
+description = "Local-first electricity bill analytics (desktop, server and Android APK)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dynamic = ["version"]
+dependencies = [
+    "Flask>=3.0",
+    "SQLAlchemy>=2.0",
+    "PyMuPDF>=1.24",
+    "pdfplumber>=0.11",
+    "pytesseract>=0.3.10",
+    "Pillow>=10.0",
+    "openpyxl>=3.1",
+    "pywebview>=5.0",
+    "platformdirs>=4.0",
+]
+
+[project.scripts]
+wattly = "wattly.__main__:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "wattly.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["wattly*"]
+
+[tool.setuptools.package-data]
+wattly = ["web/templates/**/*.html", "web/static/**/*"]

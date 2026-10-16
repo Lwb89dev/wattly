@@ -17,4 +17,7 @@ bin/
 # PyInstaller frozen artifacts
 wattly.spec
 packaging/desktop_entry.spec
+# Android release signing — never commit
+*.keystore
+packaging/android/wattly-release.keystore
 

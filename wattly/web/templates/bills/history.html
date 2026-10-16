@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ t('nav.history') }}{% endblock %}
+{% block page_title %}{{ t('nav.history') }}{% endblock %}
+{% block actions %}
+  <a class="btn btn-primary" href="{{ url_for('bills.new') }}">{{ ui.icon('plus') }} {{ t('form.title_create') }}</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <form method="get" class="field-grid" style="align-items:end">
+    {{ ui.field(t('hist.provider'), 'provider', filters.get('provider', ''), placeholder=t('hist.provider_any')) }}
+    <div class="field">
+      <label for="year">{{ t('hist.year') }}</label>
+      <select id="year" name="year">
+        <option value="">{{ t('hist.year_any') }}</option>
+        {% for y in years %}
+          <option value="{{ y }}" {{ 'selected' if filters.get('year') == y|string }}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="month">{{ t('hist.month') }}</label>
+      <select id="month" name="month">
+        <option value="">{{ t('hist.month_any') }}</option>
+        {% for m in range(1, 13) %}
+          <option value="{{ m }}" {{ 'selected' if filters.get('month') == m|string }}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {{ ui.field(t('hist.period_from'), 'from', filters.get('from', ''), type='date') }}
+    {{ ui.field(t('hist.period_to'), 'to', filters.get('to', ''), type='date') }}
+    {{ ui.field(t('hist.min_cost'), 'min_cost', filters.get('min_cost', ''), placeholder='0,00') }}
+    {{ ui.field(t('hist.max_cost'), 'max_cost', filters.get('max_cost', ''), placeholder='500,00') }}
+    {{ ui.field(t('hist.min_kwh'), 'min_kwh', filters.get('min_kwh', ''), placeholder='0') }}
+    {{ ui.field(t('hist.max_kwh'), 'max_kwh', filters.get('max_kwh', ''), placeholder='1000') }}
+    {{ ui.field(t('hist.search'), 'q', filters.get('q', ''), placeholder=t('hist.search_ph')) }}
+    <div class="field">
+      <button class="btn" type="submit">{{ ui.icon('eye') }} {{ t('hist.filter_btn') }}</button>
+    </div>
+  </form>
+</div>
+
+<div class="card section-gap">
+  <div class="card-title">{{ t('hist.found', n=count) }}</div>
+  {% if bills %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>{{ t('hist.col_period') }}</th><th>{{ t('hist.col_provider') }}</th>
+            <th class="num">{{ t('hist.col_kwh') }}</th><th class="num">{{ t('hist.col_daily') }}</th>
+            <th class="num">{{ t('hist.col_total') }}</th><th class="num">€/kWh</th>
+            <th>{{ t('hist.col_source') }}</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for b in bills %}
+        <tr>
+          <td>
+            {{ (b.billing_period_start or b.issue_date)|d('%d %b %Y') }}
+            {% if b.billing_period_end %}<div class="row-sub">→ {{ b.billing_period_end|d('%d %b %Y') }}</div>{% endif %}
+          </td>
+          <td class="row-provider">{{ b.provider_name }}
+            {% if b.tariff_type %}<div class="row-sub">{{ b.tariff_type }}</div>{% endif %}
+          </td>
+          <td class="num">{{ b.total_kwh|num(1) }}</td>
+          <td class="num">{{ b.avg_daily_kwh|num(2) }}</td>
+          <td class="num">{{ b.total_amount_cents|money(b.currency) }}</td>
+          <td class="num">{{ b.effective_total_cost_per_kwh|per_kwh }}</td>
+          <td>{{ ui.badge(b.parse_method, 'info' if b.parse_method in ['text', 'ocr'] else 'neutral') }}</td>
+          <td class="num"><a class="btn btn-ghost btn-sm" href="{{ url_for('bills.detail', bill_id=b.id) }}">{{ ui.icon('eye') }}</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="dim">{{ t('hist.empty') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

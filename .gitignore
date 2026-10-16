@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.pyc
+*.db
+.wattly-data/
+.smoke-*
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+# personal bills — never commit
+wattly/bollette/
+# Android (buildozer / p4a)
+.buildozer/
+bin/
+*.apk
+# PyInstaller frozen artifacts
+wattly.spec
+packaging/desktop_entry.spec
+

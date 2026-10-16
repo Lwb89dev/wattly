@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ t('nav.dashboard') }}{% endblock %}
+{% block page_title %}{{ t('nav.dashboard') }}{% endblock %}
+{% block actions %}
+  <a class="btn" href="{{ url_for('bills.new') }}">{{ ui.icon('plus') }} {{ t('dash.add_manually') }}</a>
+  <a class="btn btn-primary" href="{{ url_for('import.index') }}">{{ ui.icon('upload') }} {{ t('nav.import') }}</a>
+{% endblock %}
+
+{% block content %}
+{% if report.bill_count == 0 %}
+  <div class="empty-state">
+    {{ ui.icon('bolt') }}
+    <h2>{{ t('dash.empty_title') }}</h2>
+    <p>{{ t('dash.empty_text') }}</p>
+    <div class="empty-actions">
+      <a class="btn btn-primary" href="{{ url_for('import.index') }}">{{ ui.icon('upload') }} {{ t('dash.import_first') }}</a>
+      <a class="btn" href="{{ url_for('bills.new') }}">{{ ui.icon('edit') }} {{ t('dash.enter_manually') }}</a>
+      <form method="post" action="{{ url_for('settings.demo') }}">
+        <button class="btn" type="submit">{{ ui.icon('database') }} {{ t('dash.load_demo') }}</button>
+      </form>
+    </div>
+  </div>
+{% else %}
+  <div class="grid grid-4">
+    {{ ui.stat_card(
+         t('dash.consumption') ~ ' · ' ~ (latest.billing_period_start|d('%b %Y') if latest else '—'),
+         (latest.total_kwh|num(0) ~ ' kWh') if latest else '—',
+         deltas.kwh, none,
+         t('common.vs') ~ ' ' ~ (prev.billing_period_start|d('%b %Y') if prev else t('dash.no_earlier_bill'))) }}
+    {{ ui.stat_card(
+         t('dash.total_cost') ~ ' · ' ~ (latest.billing_period_start|d('%b %Y') if latest else '—'),
+         latest.total_amount_cents|money if latest else '—',
+         deltas.cost, false,
+         t('dash.vs_previous')) }}
+    {{ ui.stat_card(
+         t('dash.effective_price'),
+         latest.effective_total_cost_per_kwh|per_kwh if latest else '—',
+         deltas.per_kwh, false,
+         t('dash.everything_included')) }}
+    {{ ui.stat_card(
+         t('dash.archive'),
+         report.bill_count ~ ' ' ~ t('common.bills'),
+         none, none,
+         report.total_kwh|num(0) ~ ' kWh · ' ~ (report.effective_cost_per_kwh|per_kwh)) }}
+  </div>
+
+  <div class="col-main section-gap">
+    <div class="card">
+      <div class="card-title">{{ ui.icon('chart') }} {{ t('dash.trend_title') }}</div>
+      <div class="chart-box"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="stack">
+      <div class="card">
+        <div class="card-title">{{ t('dash.latest_bill') }}</div>
+        {% if latest %}
+        <div class="stack" style="gap:8px">
+          <div class="flex-between">
+            <strong>{{ latest.provider_name }}</strong>
+            {{ ui.badge(latest.billing_period_start|d('%b %Y'), 'info') }}
+          </div>
+          <div class="dl-grid">
+            <div class="dl-item"><dt>kWh</dt><dd>{{ latest.total_kwh|num(1) }}</dd></div>
+            <div class="dl-item"><dt>{{ t('det.total_amount') }}</dt><dd>{{ latest.total_amount_cents|money(latest.currency) }}</dd></div>
+            <div class="dl-item"><dt>€/kWh</dt><dd>{{ latest.effective_total_cost_per_kwh|per_kwh }}</dd></div>
+          </div>
+          <a class="btn btn-sm" href="{{ url_for('bills.detail', bill_id=latest.id) }}">{{ ui.icon('eye') }} {{ t('common.open') }}</a>
+        </div>
+        {% endif %}
+      </div>
+      {% if anomalies or issues %}
+      <div class="card">
+        <div class="card-title">{{ ui.icon('alert') }} {{ t('dash.alerts') }}</div>
+        <div class="stack" style="gap:9px">
+          {% for a in anomalies %}
+            <div class="flex-between" style="align-items:flex-start">
+              <div>
+                <strong>{{ a.label }}</strong>
+                <div class="dim" style="font-size:12.5px">{{ a.message }}</div>
+              </div>
+              {{ ui.badge(t('dash.anomaly_badge'), 'warn') }}
+            </div>
+          {% endfor %}
+          {% for log in issues %}
+            <div class="dim" style="font-size:12.5px">
+              <span class="mono">{{ log.step }}</span> — {{ log.message }}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card section-gap">
+    <div class="card-title">{{ t('dash.recent_bills') }}</div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th>{{ t('hist.col_period') }}</th><th>{{ t('hist.col_provider') }}</th>
+              <th class="num">{{ t('hist.col_kwh') }}</th><th class="num">{{ t('hist.col_total') }}</th>
+              <th class="num">€/kWh</th><th>{{ t('hist.col_source') }}</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for b in recent %}
+          <tr>
+            <td>{{ (b.billing_period_start or b.issue_date)|d('%b %Y') }}</td>
+            <td class="row-provider">{{ b.provider_name }}</td>
+            <td class="num">{{ b.total_kwh|num(1) }}</td>
+            <td class="num">{{ b.total_amount_cents|money(b.currency) }}</td>
+            <td class="num">{{ b.effective_total_cost_per_kwh|per_kwh }}</td>
+            <td>{{ ui.badge(b.parse_method, 'neutral') }}</td>
+            <td class="num"><a class="btn btn-ghost btn-sm" href="{{ url_for('bills.detail', bill_id=b.id) }}">{{ ui.icon('eye') }}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if chart and chart.labels %}
+<script>WattlyPage.dashboard({{ chart|tojson }});</script>
+{% endif %}
+{% endblock %}

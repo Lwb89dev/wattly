@@ -1,0 +1,112 @@
+{# Shared UI macros: icons, cards, form fields, badges. #}
+
+{% macro icon(name) -%}
+{%- set paths = {
+  'bolt': 'M13 2 4 14h6l-1 8 9-12h-6l1-8z',
+  'grid': 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
+  'upload': 'M12 16V4M6 10l6-6 6 6M4 20h16',
+  'files': 'M7 3h8l4 4v14H7zM14 3v5h5',
+  'chart': 'M3 20h18M6 16v-5M11 16V8M16 16v-8',
+  'swap': 'M7 16V5M4 8l3-3 3 3M17 8v11M14 16l3 3 3-3',
+  'download': 'M12 4v12M6 10l6 6 6-6M4 20h16',
+  'gear': 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1',
+  'sun': 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4',
+  'moon': 'M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z',
+  'trash': 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
+  'edit': 'M4 20h4L20 8l-4-4L4 16v4zM13 7l4 4',
+  'refresh': 'M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4',
+  'alert': 'M12 3 2 20h20L12 3zM12 10v4M12 17.5v.5',
+  'check': 'M4 12.5l5 5L20 6.5',
+  'x': 'M6 6l12 12M18 6 6 18',
+  'doc': 'M7 3h8l4 4v14H7zM14 3v5h5M10 13h6M10 17h6',
+  'plus': 'M12 5v14M5 12h14',
+  'up-right': 'M7 17 17 7M9 7h8v8',
+  'down-right': 'M7 7l10 10M17 9v8H9',
+  'eye': 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z',
+  'database': 'M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+  'minus': 'M5 12h14'
+} -%}
+<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="{{ paths.get(name, paths['bolt']) }}"/>
+  {%- if name == 'eye' or name == 'bolt-socket' %}<circle cx="12" cy="12" r="3"/>{% endif %}
+</svg>
+{%- endmacro %}
+
+{% macro badge(text, kind='neutral') %}
+<span class="badge badge-{{ kind }}">{{ text }}</span>
+{% endmacro %}
+
+{% macro meter(value, label=None) %}
+<div class="meter" title="{{ (value * 100)|round|int }}%">
+  <div class="meter-fill meter-{{ 'ok' if value >= 0.75 else ('warn' if value >= 0.45 else 'bad') }}"
+       style="width: {{ (value * 100)|round|int }}%"></div>
+</div>
+{% endmacro %}
+
+{% macro delta_chip(delta, good_when_up=None) %}
+{%- if delta is not none -%}
+  {%- set up = delta > 0 -%}
+  {%- set good = (up == good_when_up) if good_when_up is not none else none -%}
+  <span class="delta {{ 'up' if up else 'down' }} {{ 'good' if good else ('bad' if good is sameas false else '') }}">
+    {{ icon('up-right' if up else 'down-right') }}{{ '%+.1f'|format(delta) }}%
+  </span>
+{%- endif -%}
+{% endmacro %}
+
+{% macro stat_card(label, value, delta=None, good_when_up=None, sub=None) %}
+<div class="stat-card">
+  <div class="stat-head">
+    <span class="stat-label">{{ label }}</span>
+    {{ delta_chip(delta, good_when_up) }}
+  </div>
+  <div class="stat-value">{{ value }}</div>
+  {% if sub %}<div class="stat-sub">{{ sub }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro field(label, name, value='', type='text', error=None, confidence=None, hint=None, placeholder='') %}
+<div class="field {{ 'has-error' if error }}">
+  <label for="{{ name }}">{{ label }}
+    {%- if confidence is not none %}
+      {%- set cls = 'ok' if confidence >= 0.75 else ('warn' if confidence >= 0.45 else 'bad') %}
+      <span class="conf conf-{{ cls }}" title="{{ t('rev.confidence_title', n=(confidence * 100)|round|int) }}"></span>
+    {%- endif %}
+  </label>
+  <input id="{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ value }}"
+         placeholder="{{ placeholder }}">
+  {% if error %}<div class="field-error">{{ error }}</div>
+  {% elif hint %}<div class="field-hint">{{ hint }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro band_editor(bands, t) %}
+<div class="band-editor" id="band-editor">
+  <div class="band-head">
+    <span>{{ t('form.bands_title') }} <span class="dim">{{ t('form.bands_hint') }}</span></span>
+    <button type="button" class="btn btn-ghost btn-sm" data-add-band>{{ icon('plus') }} {{ t('form.add_band') }}</button>
+  </div>
+  <div id="band-rows">
+    {% for b in bands %}
+      <div class="band-row">
+        <input name="band_label" list="band-labels" value="{{ b.label }}" placeholder="{{ t('form.band_label_ph') }}" aria-label="{{ t('form.bands_title') }}">
+        <input name="band_kwh" value="{{ b.kwh }}" placeholder="{{ t('form.band_kwh_ph') }}" inputmode="decimal" aria-label="kWh">
+        <input name="band_amount" value="{{ b.amount }}" placeholder="{{ t('form.band_amount_ph') }}" inputmode="decimal" aria-label="{{ t('form.total_amount') }}">
+        <button type="button" class="btn btn-ghost btn-icon" data-remove-band title="{{ t('common.delete') }}">{{ icon('x') }}</button>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+<template id="band-row-template">
+  <div class="band-row">
+    <input name="band_label" list="band-labels" placeholder="{{ t('form.band_label_ph') }}" aria-label="{{ t('form.bands_title') }}">
+    <input name="band_kwh" placeholder="{{ t('form.band_kwh_ph') }}" inputmode="decimal" aria-label="kWh">
+    <input name="band_amount" placeholder="{{ t('form.band_amount_ph') }}" inputmode="decimal" aria-label="{{ t('form.total_amount') }}">
+    <button type="button" class="btn btn-ghost btn-icon" data-remove-band title="{{ t('common.delete') }}">{{ icon('x') }}</button>
+  </div>
+</template>
+<datalist id="band-labels">
+  <option value="F1"></option><option value="F2"></option>
+  <option value="F3"></option><option value="Mono"></option>
+</datalist>
+{% endmacro %}

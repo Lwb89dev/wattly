@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}#{{ bill.id }}{% endblock %}
+{% block page_title %}{{ t('common.bill') }} #{{ bill.id }}{% endblock %}
+{% block actions %}
+  {{ ui.badge(bill.parse_method, 'info' if bill.parse_method in ['text', 'ocr'] else 'neutral') }}
+  {% if bill.parse_confidence is not none %}
+    {{ ui.badge(t('rev.extraction_pct', n=(bill.parse_confidence * 100)|round|int),
+                'ok' if bill.parse_confidence >= 0.75 else ('warn' if bill.parse_confidence >= 0.45 else 'error')) }}
+  {% endif %}
+  <a class="btn" href="{{ url_for('bills.edit', bill_id=bill.id) }}">{{ ui.icon('edit') }} {{ t('det.edit') }}</a>
+  {% if bill.document_id %}
+    <form method="post" action="{{ url_for('bills.reparse', bill_id=bill.id) }}" style="display:inline">
+      <button class="btn" type="submit">{{ ui.icon('refresh') }} {{ t('det.reparse') }}</button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+{% for w in warnings %}
+  <div class="alert alert-warning">{{ ui.icon('alert') }}<span>{{ w }}</span></div>
+{% endfor %}
+{% for d in duplicates %}
+  <div class="alert alert-warning">{{ ui.icon('alert') }}<span>{{ t('det.dup_warning') }}
+    <a href="{{ url_for('bills.detail', bill_id=d.id) }}">#{{ d.id }}</a>
+    {{ d.provider_name }}, {{ t('det.dup_same_period') }}</span></div>
+{% endfor %}
+
+<div class="col-main">
+  <div>
+    <div class="card">
+      <div class="card-title">{{ bill.provider_name or t('common.bill') }}
+        <span class="dim" style="text-transform:none;letter-spacing:0">
+          {{ (bill.billing_period_start or bill.issue_date)|d('%d %b %Y') }}
+          {% if bill.billing_period_end %}→ {{ bill.billing_period_end|d('%d %b %Y') }}{% endif %}
+        </span>
+      </div>
+      <div class="dl-grid">
+        <div class="dl-item"><dt>{{ t('det.total_amount') }}</dt><dd>{{ bill.total_amount_cents|money(bill.currency) }}</dd></div>
+        <div class="dl-item"><dt>{{ t('det.total_kwh') }}</dt><dd>{{ bill.total_kwh|num(1) }}</dd></div>
+        <div class="dl-item"><dt>{{ t('det.avg_daily') }}</dt><dd>{{ bill.avg_daily_kwh|num(2) }}</dd></div>
+        <div class="dl-item"><dt>{{ t('det.effective') }}</dt><dd>{{ bill.effective_total_cost_per_kwh|per_kwh }}</dd></div>
+        <div class="dl-item"><dt>{{ t('det.energy_per_kwh') }}</dt><dd>{{ bill.avg_cost_per_kwh|per_kwh }}</dd></div>
+        <div class="dl-item"><dt>{{ t('det.period_length') }}</dt><dd>{{ bill.period_days() }} {{ t('det.days') }}</dd></div>
+        <div class="dl-item"><dt>{{ t('form.energy') }}</dt><dd>{{ bill.energy_charges_cents|money(bill.currency) }}</dd></div>
+        <div class="dl-item"><dt>{{ t('form.fixed') }}</dt><dd>{{ bill.fixed_charges_cents|money(bill.currency) }}</dd></div>
+        <div class="dl-item"><dt>{{ t('form.taxes') }}</dt><dd>{{ bill.taxes_and_fees_cents|money(bill.currency) }}</dd></div>
+        <div class="dl-item"><dt>{{ t('det.issue') }}</dt><dd>{{ bill.issue_date|d('%d %b %Y') }}</dd></div>
+        <div class="dl-item"><dt>POD</dt><dd class="mono">{{ bill.pod_identifier or '—' }}</dd></div>
+        <div class="dl-item"><dt>{{ t('form.account') }}</dt><dd class="mono">{{ bill.account_number or '—' }}</dd></div>
+        <div class="dl-item"><dt>{{ t('det.tariff') }}</dt><dd>{{ bill.tariff_type or '—' }}</dd></div>
+        <div class="dl-item"><dt>{{ t('det.readings') }}</dt><dd>{{ bill.previous_reading|num(1) if bill.previous_reading is not none else '—' }} → {{ bill.current_reading|num(1) if bill.current_reading is not none else '—' }}</dd></div>
+        <div class="dl-item"><dt>{{ t('det.reading_dates') }}</dt><dd>{{ bill.reading_start_date|d('%d %b') if bill.reading_start_date else '—' }} → {{ bill.reading_end_date|d('%d %b %Y') if bill.reading_end_date else '—' }}</dd></div>
+        <div class="dl-item"><dt>{{ t('form.currency') }}</dt><dd>{{ bill.currency }}</dd></div>
+      </div>
+      {% if bill.notes %}
+        <p class="dim section-gap" style="margin-bottom:0">“{{ bill.notes }}”</p>
+      {% endif %}
+    </div>
+
+    {% if bill.time_bands %}
+    <div class="card section-gap">
+      <div class="card-title">{{ t('det.time_bands') }}</div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>{{ t('det.band') }}</th><th class="num">{{ t('hist.col_kwh') }}</th>
+            <th class="num">{{ t('det.amount') }}</th><th class="num">{{ t('det.share') }}</th></tr></thead>
+          <tbody>
+            {% for b in bill.time_bands %}
+            <tr>
+              <td>{{ ui.badge(b.label, 'info') }}</td>
+              <td class="num">{{ b.kwh|num(1) }}</td>
+              <td class="num">{{ b.amount_cents|money(bill.currency) if b.amount_cents is not none else '—' }}</td>
+              <td class="num">{{ ((b.kwh or 0) / bill.total_kwh * 100)|num(1) ~ '%' if bill.total_kwh }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="chart-box short section-gap"><canvas id="bandsChart"></canvas></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-title">{{ t('det.source') }}</div>
+      <div class="stack" style="gap:10px;font-size:13.5px">
+        {% if doc %}
+          <div class="flex-between"><span class="dim">{{ t('det.original_file') }}</span>
+            <a href="{{ url_for('import.raw', doc_id=doc.id) }}" target="_blank">{{ doc.original_filename }}</a></div>
+          <div class="flex-between"><span class="dim">{{ t('det.uploaded') }}</span><span>{{ doc.uploaded_at|d('%d %b %Y %H:%M') if doc.uploaded_at else '—' }}</span></div>
+          <div class="flex-between"><span class="dim">{{ t('det.pages_ocr') }}</span>
+            <span>{{ doc.page_count or '—' }} / {{ t('common.yes') if doc.ocr_used else t('common.no') }}</span></div>
+        {% else %}
+          <span class="dim">{{ t('det.manual_entry') }}</span>
+        {% endif %}
+        <div class="flex-between"><span class="dim">{{ t('det.parse_method') }}</span><span>{{ bill.parse_method }}</span></div>
+        {% if bill.parse_confidence is not none %}
+          <div>
+            <div class="flex-between" style="margin-bottom:5px">
+              <span class="dim">{{ t('det.confidence') }}</span><span>{{ (bill.parse_confidence * 100)|round|int }}%</span>
+            </div>
+            {{ ui.meter(bill.parse_confidence) }}
+          </div>
+        {% endif %}
+        {% set corrected = bill.field_sources.values() | select('equalto', 'corrected') | list %}
+        {% set manual = bill.field_sources.values() | select('equalto', 'manual') | list %}
+        <div class="chip-row">
+          {{ ui.badge(t('det.corrected', n=corrected|length), 'warn' if corrected else 'neutral') }}
+          {{ ui.badge(t('det.manual_fields', n=manual|length), 'info' if manual else 'neutral') }}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">{{ t('det.actions') }}</div>
+      <div class="stack" style="gap:9px">
+        <a class="btn" href="{{ url_for('bills.edit', bill_id=bill.id) }}">{{ ui.icon('edit') }} {{ t('det.edit_data') }}</a>
+        {% if bill.document_id %}
+          <form method="post" action="{{ url_for('bills.reparse', bill_id=bill.id) }}">
+            <button class="btn" style="width:100%" type="submit">{{ ui.icon('refresh') }} {{ t('det.re_run') }}</button>
+          </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('bills.delete', bill_id=bill.id) }}"
+              data-confirm="{{ t('det.delete_confirm') }}">
+          <button class="btn btn-danger" style="width:100%" type="submit">{{ ui.icon('trash') }} {{ t('det.delete_bill') }}</button>
+        </form>
+      </div>
+    </div>
+
+    {% if logs %}
+    <div class="card">
+      <div class="card-title">{{ t('det.audit') }}</div>
+      <ul class="timeline">
+        {% for log in logs %}
+        <li class="status-{{ log.status }}">
+          <div><span class="t-step">{{ log.step }}</span>
+            <span class="t-meta">{{ log.status }} · {{ log.created_at|d('%d %b %H:%M') if log.created_at }}</span></div>
+          {% if log.message %}<div class="t-msg">{{ log.message }}</div>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if bill.time_bands %}
+<script>
+WattlyPage.bands({
+  labels: {{ bill.time_bands | map(attribute='label') | list | tojson }},
+  kwh: {{ bill.time_bands | map(attribute='kwh') | list | tojson }},
+  amounts: {{ bill.time_bands | map(attribute='amount_cents') | list | tojson }}
+});
+</script>
+{% endif %}
+{% endblock %}

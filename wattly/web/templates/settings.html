@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ t('nav.settings') }}{% endblock %}
+{% block page_title %}{{ t('nav.settings') }}{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">{{ ui.icon('gear') }} {{ t('set.prefs') }}</div>
+    <form method="post" class="field-grid">
+      <div class="field">
+        <label for="language">{{ t('set.language') }}</label>
+        <select id="language" name="language">
+          <option value="" {{ 'selected' if not settings._stored_language }}>Auto</option>
+          <option value="en" {{ 'selected' if settings._stored_language == 'en' }}>English</option>
+          <option value="it" {{ 'selected' if settings._stored_language == 'it' }}>Italiano</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="currency">{{ t('set.currency') }}</label>
+        <select id="currency" name="currency">
+          {% for c in currencies %}
+            <option value="{{ c }}" {{ 'selected' if settings.currency == c }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="locale">{{ t('set.number_format') }}</label>
+        <select id="locale" name="locale">
+          {% for code, label_key in locales %}
+            <option value="{{ code }}" {{ 'selected' if settings.locale == code }}>{{ t(label_key) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="theme">{{ t('set.theme') }}</label>
+        <select id="theme" name="theme">
+          <option value="auto" {{ 'selected' if settings.theme == 'auto' }}>{{ t('set.theme_auto') }}</option>
+          <option value="light" {{ 'selected' if settings.theme == 'light' }}>{{ t('set.theme_light') }}</option>
+          <option value="dark" {{ 'selected' if settings.theme == 'dark' }}>{{ t('set.theme_dark') }}</option>
+        </select>
+      </div>
+      <div class="field span-12" style="flex-direction:row;align-items:center;gap:10px">
+        <input type="checkbox" id="ocr_enabled" name="ocr_enabled" value="1"
+               style="width:16px;height:16px" {{ 'checked' if settings.ocr_enabled == '1' }}>
+        <label for="ocr_enabled" style="margin:0">{{ t('set.ocr_enable') }}</label>
+      </div>
+      <div class="field span-12">
+        <button class="btn btn-primary" type="submit">{{ ui.icon('check') }} {{ t('set.save') }}</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-title">{{ ui.icon('download') }} {{ t('set.update_title') }}</div>
+      <div class="stack" style="gap:10px;font-size:13.5px">
+        <div class="flex-between"><span class="dim">{{ t('set.update_version', v=app_version) }}</span>
+          <span class="mono">v{{ app_version }}</span></div>
+        {% if capability != 'none' %}
+          <p class="dim" style="margin:0;font-size:12.5px">{{ t('set.update_hint') }}</p>
+        {% endif %}
+        <form id="update-check-form" method="post" action="{{ url_for('settings.update_check') }}">
+          <button class="btn" type="submit">{{ ui.icon('refresh') }} {{ t('set.update_check') }}</button>
+        </form>
+        {% if update_info and update_info.url %}
+          <a class="btn btn-primary" href="{{ update_info.url }}" target="_blank" rel="noopener">
+            {{ ui.icon('download') }} {{ t('set.update_open') }} (v{{ update_info.version }})</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">{{ ui.icon('database') }} {{ t('set.storage') }}</div>
+      <div class="stack" style="gap:10px;font-size:13.5px">
+        <div class="flex-between"><span class="dim">{{ t('set.data_dir') }}</span><span class="mono">{{ data_dir }}</span></div>
+        <div class="flex-between"><span class="dim">{{ t('set.bills_archived') }}</span><span>{{ bill_count }}</span></div>
+        <div class="flex-between"><span class="dim">{{ t('set.documents_stored') }}</span><span>{{ doc_count }}</span></div>
+        <p class="dim" style="margin:6px 0 0;font-size:12.5px">{{ t('set.privacy_text') }}</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">{{ ui.icon('bolt') }} {{ t('set.demo_title') }}</div>
+      <p class="dim" style="margin-top:0;font-size:13px">{{ t('set.demo_text') }}</p>
+      <form method="post" action="{{ url_for('settings.demo') }}">
+        <button class="btn" type="submit" {{ 'disabled' if bill_count > 0 }}>{{ ui.icon('database') }}
+          {{ t('set.demo_btn') }}</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title">{{ ui.icon('eye') }} {{ t('set.ocr_engine') }}</div>
+      {% if ocr_ok %}
+        {{ ui.badge(t('set.tesseract_ok'), 'ok') }}
+      {% else %}
+        {{ ui.badge(t('set.tesseract_ko'), 'warn') }}
+        <p class="dim" style="font-size:12.5px;margin:10px 0 0">{{ ocr_reason }}.
+          {{ t('set.ocr_install_hint') }} <span class="mono">sudo apt install tesseract-ocr tesseract-ocr-ita</span></p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var form = document.getElementById('update-check-form');
+  if (form && window.pywebview) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (window.pywebview.api && window.pywebview.api.check_and_update) {
+        window.pywebview.api.check_and_update();
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

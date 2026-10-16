@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ t('nav.export') }}{% endblock %}
+{% block page_title %}{{ t('nav.export') }}{% endblock %}
+
+{% block content %}
+{% if bill_count == 0 %}
+  <div class="empty-state">
+    {{ ui.icon('download') }}
+    <h2>{{ t('exp.empty_title') }}</h2>
+    <p>{{ t('exp.empty_text') }}</p>
+  </div>
+{% else %}
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">{{ ui.icon('files') }} {{ t('exp.bills_title') }}</div>
+    <p class="dim" style="margin-top:0">{{ t('exp.bills_desc', n=bill_count) }}</p>
+    <div class="chip-row">
+      <a class="btn" href="{{ url_for('export.download', what='bills', fmt='csv') }}">{{ ui.icon('download') }} CSV</a>
+      <a class="btn btn-primary" href="{{ url_for('export.download', what='bills', fmt='xlsx') }}">{{ ui.icon('download') }} Excel</a>
+    </div>
+    <p class="dim" style="font-size:12.5px;margin:12px 0 0">{{ t('exp.xlsx_sheets') }}</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">{{ ui.icon('chart') }} {{ t('exp.monthly_title') }}</div>
+    <p class="dim" style="margin-top:0">{{ t('exp.monthly_desc') }}</p>
+    <a class="btn" href="{{ url_for('export.download', what='monthly', fmt='csv') }}">{{ ui.icon('download') }} CSV</a>
+  </div>
+
+  <div class="card">
+    <div class="card-title">{{ ui.icon('swap') }} {{ t('exp.cmp_title') }}</div>
+    {% if last_compare %}
+      <p class="dim" style="margin-top:0">{{ t('exp.cmp_desc') }}
+        <strong>{{ t('cmp.kind_' ~ last_compare.kind_a) }} “{{ last_compare.value_a }}” vs
+        {{ t('cmp.kind_' ~ last_compare.kind_b) }} “{{ last_compare.value_b }}”</strong></p>
+      <a class="btn" href="{{ url_for('export.download', what='comparison', fmt='csv') }}">{{ ui.icon('download') }} CSV</a>
+    {% else %}
+      <p class="dim" style="margin-top:0">{{ t('exp.cmp_none') }}</p>
+      <a class="btn" href="{{ url_for('compare.index') }}">{{ ui.icon('swap') }} {{ t('exp.go_compare') }}</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

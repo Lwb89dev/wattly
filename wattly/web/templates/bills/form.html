@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ t('form.title_edit') if mode == 'edit' else t('form.title_create') }}{% endblock %}
+{% block page_title %}{{ t('form.title_edit') if mode == 'edit' else t('form.title_create') }}{% endblock %}
+{% block actions %}
+  {% if bill %}
+    {{ ui.badge('#' ~ bill.id, 'neutral') }}
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+{% if mode == 'create' %}
+<div class="alert alert-info">{{ ui.icon('doc') }}<span>{{ t('form.manual_hint') }}</span></div>
+{% endif %}
+{% for field, err in errors.items() %}
+  {% if field.startswith('band_') %}
+    <div class="alert alert-error">{{ ui.icon('alert') }}<span>{{ err }}</span></div>
+  {% endif %}
+{% endfor %}
+
+<form method="post" novalidate>
+  <div class="card">
+    <div class="card-title">{{ t('rev.bill_fields') }}</div>
+    <div class="field-grid">
+      {{ ui.field(t('form.provider'), 'provider_name', v.provider_name, error=errors.get('provider_name'), placeholder=t('form.provider_ph')) }}
+      {{ ui.field(t('form.pod'), 'pod_identifier', v.pod_identifier, error=errors.get('pod_identifier')) }}
+      {{ ui.field(t('form.account'), 'account_number', v.account_number, error=errors.get('account_number')) }}
+      {{ ui.field(t('form.period_start'), 'billing_period_start', v.billing_period_start, type='date', error=errors.get('billing_period_start')) }}
+      {{ ui.field(t('form.period_end'), 'billing_period_end', v.billing_period_end, type='date', error=errors.get('billing_period_end')) }}
+      {{ ui.field(t('form.issue_date'), 'issue_date', v.issue_date, type='date', error=errors.get('issue_date')) }}
+      {{ ui.field(t('form.tariff'), 'tariff_type', v.tariff_type, error=errors.get('tariff_type'), placeholder=t('form.tariff_ph')) }}
+      <div class="field">
+        <label for="currency">{{ t('form.currency') }}</label>
+        <select id="currency" name="currency">
+          {% for c in ['EUR', 'USD', 'GBP', 'CHF'] %}
+            <option value="{{ c }}" {{ 'selected' if v.currency == c }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {{ ui.field(t('form.total_amount'), 'total_amount', v.total_amount, error=errors.get('total_amount')) }}
+      {{ ui.field(t('form.total_kwh'), 'total_kwh', v.total_kwh, error=errors.get('total_kwh'), placeholder=t('form.total_kwh_ph')) }}
+      {{ ui.field(t('form.energy'), 'energy_charges', v.energy_charges, error=errors.get('energy_charges')) }}
+      {{ ui.field(t('form.fixed'), 'fixed_charges', v.fixed_charges, error=errors.get('fixed_charges')) }}
+      {{ ui.field(t('form.taxes'), 'taxes_and_fees', v.taxes_and_fees, error=errors.get('taxes_and_fees')) }}
+      {{ ui.field(t('form.prev_reading'), 'previous_reading', v.previous_reading, error=errors.get('previous_reading')) }}
+      {{ ui.field(t('form.curr_reading'), 'current_reading', v.current_reading, error=errors.get('current_reading')) }}
+      {{ ui.field(t('form.reading_start'), 'reading_start_date', v.reading_start_date, type='date', error=errors.get('reading_start_date')) }}
+      {{ ui.field(t('form.reading_end'), 'reading_end_date', v.reading_end_date, type='date', error=errors.get('reading_end_date')) }}
+    </div>
+
+    <div class="section-gap">{{ ui.band_editor(v.bands, t) }}</div>
+
+    <div class="field-grid section-gap">
+      <div class="field span-12">
+        <label for="notes">{{ t('form.notes') }}</label>
+        <textarea id="notes" name="notes" rows="2">{{ v.notes }}</textarea>
+      </div>
+    </div>
+
+    <div class="section-gap flex-between">
+      <a class="btn btn-ghost" href="{{ url_for('bills.history') }}">{{ t('common.cancel') }}</a>
+      <button class="btn btn-primary" type="submit">{{ ui.icon('check') }}
+        {{ t('form.save_changes') if mode == 'edit' else t('form.create') }}
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

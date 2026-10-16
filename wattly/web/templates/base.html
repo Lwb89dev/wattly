@@ -1,0 +1,74 @@
+{% import "macros.html" as ui with context %}
+<!doctype html>
+<html lang="{{ settings.language }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · Wattly</title>
+  <script>
+    (function () {
+      var saved = localStorage.getItem("wattly-theme");
+      var pref = "{{ settings.theme|default('auto') }}";
+      if (!saved) {
+        saved = pref === "auto"
+          ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+          : pref;
+      }
+      document.documentElement.dataset.theme = saved;
+    })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%232563eb' d='M13 2 4 14h6l-1 8 9-12h-6l1-8z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="{{ url_for('dashboard.index') }}">
+      {{ ui.icon('bolt') }}<span class="brand-name">WATTLY</span>
+    </a>
+    <nav class="nav">
+      {% for endpoint, label_key, icon_name in nav_items %}
+        {% set active = request.endpoint and request.endpoint.startswith(endpoint.split('.')[0] + '.') %}
+        <a class="nav-item {{ 'active' if active }}" href="{{ url_for(endpoint) }}">
+          {{ ui.icon(icon_name) }}<span>{{ t(label_key) }}</span>
+        </a>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-foot">
+      <button class="theme-toggle" data-action="theme-toggle" title="{{ t('set.theme') }}">
+        {{ ui.icon('sun') }}{{ ui.icon('moon') }}
+      </button>
+      <div class="sidebar-note">
+        <span class="dot-live"></span> {{ t('common.local_first') }} · v{{ app_version }}
+      </div>
+    </div>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+      <div class="topbar-actions">{% block actions %}{% endblock %}</div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-stack">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}" data-autohide>
+              {{ ui.icon('alert' if category in ['warning', 'error'] else 'check') }}
+              <span>{{ message }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>window.WATTLY_I18N = {{ js_i18n|tojson }};</script>
+  <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

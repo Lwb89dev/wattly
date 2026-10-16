@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ t('nav.import') }}{% endblock %}
+{% block page_title %}{{ t('nav.import') }}{% endblock %}
+{% block content %}
+<div class="grid grid-2">
+  <div>
+    <div class="dropzone" id="dropzone" data-upload-url="{{ url_for('import.upload') }}">
+      {{ ui.icon('upload') }}
+      <div class="dropzone-title">{{ t('imp.drop_title') }}</div>
+      <div class="dropzone-sub">{{ t('imp.drop_sub') }}</div>
+      <input type="file" id="file-input" accept="application/pdf,.pdf" multiple hidden>
+    </div>
+    <div class="upload-results" id="upload-results"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">{{ ui.icon('bolt') }} {{ t('imp.how_title') }}</div>
+    <div class="stack" style="font-size:13.5px">
+      <div><strong>{{ t('imp.step1_t') }}</strong><br><span class="dim">{{ t('imp.step1_d') }}</span></div>
+      <div><strong>{{ t('imp.step2_t') }}</strong><br><span class="dim">{{ t('imp.step2_d') }}</span></div>
+      <div><strong>{{ t('imp.step3_t') }}</strong><br><span class="dim">{{ t('imp.step3_d') }}</span></div>
+      <div><strong>{{ t('imp.step4_t') }}</strong><br><span class="dim">{{ t('imp.step4_d') }}</span></div>
+      <div><strong>{{ t('imp.step5_t') }}</strong><br><span class="dim">{{ t('imp.step5_d') }}</span></div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+    <div class="chip-row">
+      {% if ocr_ok %}
+        {{ ui.badge(t('imp.ocr_ready'), 'ok') }}
+      {% else %}
+        {{ ui.badge(t('imp.ocr_unavailable'), 'warn') }}
+      {% endif %}
+      {% if not ocr_enabled %}
+        {{ ui.badge(t('imp.ocr_disabled'), 'neutral') }}
+      {% endif %}
+    </div>
+    {% if not ocr_ok %}
+      <p class="dim" style="font-size:12.5px;margin:10px 0 0">{{ ocr_reason }}. {{ t('imp.ocr_fix') }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card section-gap" id="auto-import-card"
+     data-url="{{ url_for('import.auto') }}" data-pending="{{ pending_count }}">
+  <div class="flex-between">
+    <div>
+      <div class="card-title" style="margin-bottom:6px">{{ ui.icon('database') }} {{ t('imp.auto_button') }}</div>
+      <p class="dim" style="margin:0;font-size:12.5px;max-width:640px">{{ t('imp.auto_hint') }}</p>
+    </div>
+    <button class="btn btn-primary" id="auto-import-btn" type="button"
+            {{ 'disabled' if pending_count == 0 }}>
+      {{ ui.icon('bolt') }} {{ t('imp.auto_button') }}
+      {% if pending_count > 0 %}<span class="badge badge-info" style="margin-left:6px">{{ pending_count }}</span>{% endif %}
+    </button>
+  </div>
+  <div id="auto-results"></div>
+</div>
+
+<div class="card section-gap">
+  <div class="card-title">{{ ui.icon('files') }} {{ t('imp.uploads_title') }}</div>
+  {% if docs %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>{{ t('imp.col_file') }}</th><th>{{ t('imp.col_uploaded') }}</th>
+        <th class="num">{{ t('imp.col_pages') }}</th><th>{{ t('imp.col_ocr') }}</th>
+        <th>{{ t('imp.col_linked') }}</th><th></th></tr></thead>
+      <tbody>
+        {% for row in docs %}
+        <tr data-doc-row="{{ row.doc.id }}">
+          <td class="row-provider">{{ row.doc.original_filename }}</td>
+          <td class="dim">{{ row.doc.uploaded_at|d('%d %b %Y %H:%M') if row.doc.uploaded_at else '—' }}</td>
+          <td class="num">{{ row.doc.page_count or '—' }}</td>
+          <td>{{ ui.badge(t('common.yes') if row.doc.ocr_used else t('common.no'), 'ok' if row.doc.ocr_used else 'neutral') }}</td>
+          <td>
+            {% for b in row.bills %}
+              <a href="{{ url_for('bills.detail', bill_id=b.id) }}">#{{ b.id }}</a>{% if not loop.last %}, {% endif %}
+            {% else %}<span class="dim">—</span>{% endfor %}
+          </td>
+          <td class="num"><a class="btn btn-ghost btn-sm" href="{{ url_for('import.raw', doc_id=row.doc.id) }}" target="_blank">{{ ui.icon('eye') }}</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="dim">{{ t('imp.no_uploads') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

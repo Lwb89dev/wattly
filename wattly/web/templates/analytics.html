@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ t('nav.analytics') }}{% endblock %}
+{% block page_title %}{{ t('nav.analytics') }}{% endblock %}
+
+{% block content %}
+{% if report.bill_count == 0 %}
+  <div class="empty-state">
+    {{ ui.icon('chart') }}
+    <h2>{{ t('ana.empty_title') }}</h2>
+    <p>{{ t('ana.empty_text') }}</p>
+    <div class="empty-actions">
+      <a class="btn btn-primary" href="{{ url_for('import.index') }}">{{ ui.icon('upload') }} {{ t('ana.import_bills') }}</a>
+      <form method="post" action="{{ url_for('settings.demo') }}">
+        <button class="btn" type="submit">{{ ui.icon('database') }} {{ t('dash.load_demo') }}</button>
+      </form>
+    </div>
+  </div>
+{% else %}
+  <div class="grid grid-4">
+    {{ ui.stat_card(t('ana.total_consumption'), report.total_kwh|num(0) ~ ' kWh',
+                    sub=report.bill_count ~ ' ' ~ t('common.bills') ~ ' · ' ~ t('ana.across_periods')) }}
+    {{ ui.stat_card(t('ana.total_spend'), report.total_cents|money, sub=t('ana.across_periods')) }}
+    {{ ui.stat_card(t('ana.effective_price'), report.effective_cost_per_kwh|per_kwh, sub=t('ana.spend_div_kwh')) }}
+    {{ ui.stat_card(t('ana.avg_daily'), report.avg_daily_kwh|num(2) ~ ' kWh', sub=t('ana.day_weighted')) }}
+  </div>
+
+  <div class="card section-gap">
+    <div class="card-title">{{ ui.icon('chart') }} {{ t('ana.consumption_trend') }}
+      <span class="legend-inline" style="margin-left:auto">
+        <span><span class="dot" style="background:var(--accent)"></span>{{ t('ana.kwh_series') }}</span>
+        <span><span class="dot" style="background:var(--accent-2)"></span>{{ t('ana.rolling') }}</span>
+      </span>
+    </div>
+    <div class="chart-box tall"><canvas id="kwhChart"></canvas></div>
+  </div>
+
+  <div class="grid grid-2 section-gap">
+    <div class="card">
+      <div class="card-title">{{ t('ana.spending_trend') }}</div>
+      <div class="chart-box"><canvas id="costChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">{{ t('ana.effective_kwh_price') }}</div>
+      <div class="chart-box"><canvas id="perKwhChart"></canvas></div>
+    </div>
+  </div>
+
+  {% if report.band_labels %}
+  <div class="card section-gap">
+    <div class="card-title">{{ t('ana.time_bands_title') }}
+      <span class="legend-inline" style="margin-left:auto">
+        {% for lab in report.band_labels %}
+          <span><span class="dot" style="background:{{ ['var(--accent)', 'var(--accent-2)', 'var(--warn)'][loop.index0 % 3] }}"></span>{{ lab }}</span>
+        {% endfor %}
+      </span>
+    </div>
+    <div class="chart-box"><canvas id="bandsChart"></canvas></div>
+  </div>
+  {% endif %}
+
+  <div class="grid grid-2 section-gap">
+    <div class="card">
+      <div class="card-title">{{ t('ana.extremes') }}</div>
+      <div class="stack" style="gap:11px;font-size:13.5px">
+        <div class="flex-between"><span class="dim">{{ t('ana.highest_kwh') }}</span>
+          <span>{% if report.highest_kwh %}<strong>{{ report.highest_kwh.kwh|num(0) }} kWh</strong> · {{ report.highest_kwh.label }}{% endif %}</span></div>
+        <div class="flex-between"><span class="dim">{{ t('ana.lowest_kwh') }}</span>
+          <span>{% if report.lowest_kwh %}<strong>{{ report.lowest_kwh.kwh|num(0) }} kWh</strong> · {{ report.lowest_kwh.label }}{% endif %}</span></div>
+        <div class="flex-between"><span class="dim">{{ t('ana.most_expensive') }}</span>
+          <span>{% if report.highest_cost %}<strong>{{ report.highest_cost.amount_cents|money }}</strong> · {{ report.highest_cost.label }}{% endif %}</span></div>
+        <div class="flex-between"><span class="dim">{{ t('ana.cheapest') }}</span>
+          <span>{% if report.lowest_cost %}<strong>{{ report.lowest_cost.amount_cents|money }}</strong> · {{ report.lowest_cost.label }}{% endif %}</span></div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+      <div class="dl-grid" style="grid-template-columns:1fr 1fr">
+        {% for lab in report.band_labels %}
+        <div class="dl-item"><dt>{{ t('ana.band_kwh_money', label=lab) }}</dt>
+          <dd>{{ report.band_kwh.get(lab, 0)|num(0) }} kWh · {{ report.band_cents.get(lab, 0)|money }}</dd></div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">{{ ui.icon('alert') }} {{ t('ana.unusual_months') }}</div>
+      {% if report.anomalies %}
+        <div class="stack" style="gap:11px">
+          {% for a in report.anomalies %}
+          <div class="flex-between" style="align-items:flex-start">
+            <div>
+              <strong>{{ a.label }}</strong> {{ ui.badge(a.kind, 'warn' if a.kind == 'high' else 'info') }}
+              <div class="dim" style="font-size:12.5px">{{ a.message }}</div>
+            </div>
+            {% if a.bill_id %}
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('bills.detail', bill_id=a.bill_id) }}">{{ ui.icon('eye') }}</a>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="dim">{{ t('ana.no_anomalies') }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if report.yoy and report.yoy|length > 1 %}
+  <div class="card section-gap">
+    <div class="card-title">{{ t('ana.yoy') }}</div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>{{ t('ana.col_year') }}</th><th class="num">{{ t('hist.col_kwh') }}</th>
+          <th class="num">{{ t('ana.col_spend') }}</th><th class="num">€/kWh</th>
+          <th class="num">{{ t('ana.col_delta_kwh') }}</th><th class="num">{{ t('ana.col_delta_cost') }}</th></tr></thead>
+        <tbody>
+          {% for row in report.yoy %}
+          <tr>
+            <td class="row-provider">{{ row.year }}</td>
+            <td class="num">{{ row.kwh|num(0) }}</td>
+            <td class="num">{{ row.cents|money }}</td>
+            <td class="num">{{ row.cost_per_kwh|per_kwh }}</td>
+            <td class="num">{{ ui.delta_chip(row.get('kwh_delta_pct'), none) }}</td>
+            <td class="num">{{ ui.delta_chip(row.get('cost_delta_pct'), false) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if report.bill_count %}
+<script>WattlyPage.analytics({{ chart|tojson }});</script>
+{% endif %}
+{% endblock %}

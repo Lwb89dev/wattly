@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build-windows:
+    name: Windows standalone .exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Freeze standalone binary
+        run: >
+          pyinstaller --noconfirm --clean --onefile --windowed
+          --name wattly
+          --icon wattly/assets/icons/icon.ico
+          --collect-all webview
+          --add-data "wattly/web/templates;wattly/web/templates"
+          --add-data "wattly/web/static;wattly/web/static"
+          packaging/desktop_entry.py
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p release
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp dist/wattly.exe "release/wattly-${VERSION}-windows-x86_64.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wattly-windows
+          path: release/
+
+  build-linux:
+    name: Linux standalone binary + .deb
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install GUI runtime libraries (freeze + smoke deps)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 \
+            libgtk-3-0t64 libwebkit2gtk-4.1-0 \
+            xvfb
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Freeze standalone binary
+        run: >
+          pyinstaller --noconfirm --clean --onefile
+          --name wattly
+          --collect-all webview
+          --add-data "wattly/web/templates:wattly/web/templates"
+          --add-data "wattly/web/static:wattly/web/static"
+          packaging/desktop_entry.py
+
+      - name: Smoke-test the frozen binary under Xvfb
+        run: |
+          timeout 30 xvfb-run -a dist/wattly --server &
+          sleep 12
+          curl -fsS http://127.0.0.1:5055/ >/dev/null && echo "SMOKE OK" || (echo "SMOKE FAILED"; exit 1)
+
+      - name: Build .deb package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          PKG="wattly_${VERSION}_amd64"
+          STAGE="release/${PKG}"
+          mkdir -p "${STAGE}/DEBIAN" "${STAGE}/usr/bin" \
+                   "${STAGE}/usr/share/applications" \
+                   "${STAGE}/usr/share/icons/hicolor/256x256/apps"
+          cp dist/wattly "${STAGE}/usr/bin/wattly"
+          chmod 755 "${STAGE}/usr/bin/wattly"
+          cp packaging/wattly.desktop "${STAGE}/usr/share/applications/wattly.desktop"
+          cp wattly/assets/icons/icon-256.png "${STAGE}/usr/share/icons/hicolor/256x256/apps/wattly.png"
+          {
+            echo "Package: wattly"
+            echo "Version: ${VERSION}"
+            echo "Section: utils"
+            echo "Priority: optional"
+            echo "Architecture: amd64"
+            echo "Maintainer: Lwb89dev <https://github.com/Lwb89dev>"
+            echo "Homepage: https://github.com/Lwb89dev/wattly"
+            echo "Description: Local-first electricity bill analytics"
+            echo " Wattly turns your electricity bills into a historical archive with"
+            echo " consumption trends, effective €/kWh, F1/F2/F3 band breakdowns,"
+            echo " period comparisons and CSV/Excel exports. No cloud, no account."
+            echo "Depends: libgtk-3-0t64 | libgtk-3-0, libwebkit2gtk-4.1-0 | libwebkit2gtk-4.0-37, libglib2.0-0t64 | libglib2.0-0"
+          } > "${STAGE}/DEBIAN/control"
+          dpkg-deb --build "${STAGE}"
+          rm -rf "${STAGE}"
+          ls -la release/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wattly-linux
+          path: release/
+
+  publish:
+    name: Publish GitHub release
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Attach assets to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

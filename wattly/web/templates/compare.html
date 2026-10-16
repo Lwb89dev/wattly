@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ t('nav.compare') }}{% endblock %}
+{% block page_title %}{{ t('nav.compare') }}{% endblock %}
+
+{% block content %}
+{% if bill_count == 0 %}
+  <div class="empty-state">
+    {{ ui.icon('swap') }}
+    <h2>{{ t('cmp.empty_title') }}</h2>
+    <p>{{ t('cmp.empty_text') }}</p>
+    <div class="empty-actions">
+      <a class="btn btn-primary" href="{{ url_for('import.index') }}">{{ ui.icon('upload') }} {{ t('ana.import_bills') }}</a>
+    </div>
+  </div>
+{% else %}
+<div class="card">
+  <form method="get" id="compare-form">
+    <div class="grid grid-2">
+      {% for side in ['a', 'b'] %}
+      {% set kind = kind_a if side == 'a' else kind_b %}
+      {% set value = value_a if side == 'a' else value_b %}
+      <div class="selector card" style="box-shadow:none"
+           data-side="{{ side }}"
+           data-months='{{ months | tojson }}'
+           data-providers='{{ providers | tojson }}'>
+        <div class="card-title">{{ t('cmp.period_' ~ side) }}</div>
+        <div class="field">
+          <label>{{ t('cmp.type') }}</label>
+          <select name="kind_{{ side }}" class="kind-select">
+            {% for k, label_key in kinds %}
+              <option value="{{ k }}" {{ 'selected' if kind == k }}>{{ t(label_key) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field value-slot" style="margin-top:10px" data-name="value_{{ side }}" data-value="{{ value }}">
+          <label>{{ t('cmp.value') }}</label>
+          <input type="text" name="value_{{ side }}" value="{{ value }}">
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="section-gap" style="display:flex;justify-content:flex-end">
+      <button class="btn btn-primary" type="submit">{{ ui.icon('swap') }} {{ t('cmp.compare_btn') }}</button>
+    </div>
+  </form>
+</div>
+
+{% if error %}
+  <div class="alert alert-error section-gap">{{ ui.icon('alert') }}<span>{{ error }}</span></div>
+{% endif %}
+
+{% if result %}
+  <div class="section-gap flex-between" style="margin-bottom:14px">
+    <h2 style="font-size:17px">{{ result.label_a }} <span class="dim">{{ t('common.vs') }}</span> {{ result.label_b }}</h2>
+    {{ ui.badge(t('cmp.deltas_note'), 'neutral') }}
+  </div>
+
+  <div class="grid grid-4">
+    {{ ui.stat_card(t('cmp.consumption'),
+        result.a.kwh|num(0) ~ ' kWh → ' ~ result.b.kwh|num(0) ~ ' kWh',
+        result.kwh_delta_pct, none,
+        t('cmp.delta_kwh', n=result.kwh_delta|num(1))) }}
+    {{ ui.stat_card(t('cmp.total_cost'),
+        result.a.cents|money ~ ' → ' ~ result.b.cents|money,
+        result.cost_delta_pct, false,
+        t('cmp.delta_cost', n=result.cost_delta_cents|money)) }}
+    {{ ui.stat_card(t('cmp.effective_price'),
+        (result.a.cost_per_kwh|num(4) ~ ' → ' ~ result.b.cost_per_kwh|num(4)) if result.a.cost_per_kwh and result.b.cost_per_kwh else '—',
+        none, false,
+        t('cmp.delta_per_kwh', n=result.cost_per_kwh_delta|num(4)) if result.cost_per_kwh_delta is not none else '') }}
+    {{ ui.stat_card(t('cmp.daily_average'),
+        result.a.daily_kwh|num(2) ~ ' → ' ~ result.b.daily_kwh|num(2) ~ ' kWh',
+        result.daily_kwh_delta_pct, none,
+        t('cmp.day_weighted_note')) }}
+  </div>
+
+  <div class="grid grid-2 section-gap">
+    <div class="card">
+      <div class="card-title">{{ t('cmp.side_by_side') }}</div>
+      <div class="chart-box"><canvas id="compareChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">{{ t('cmp.whats_inside') }}</div>
+      <div class="stack" style="gap:8px;font-size:13.5px">
+        {% for agg in [result.a, result.b] %}
+        <div class="flex-between"><strong>{{ agg.label }}</strong>
+          <span class="dim">{{ agg.bills|length }} {{ t('common.bills') }} · {{ agg.kwh|num(0) }} kWh</span></div>
+        {% endfor %}
+        {% if result.a.band_kwh or result.b.band_kwh %}
+          <div class="chart-box short"><canvas id="compareBandsChart"></canvas></div>
+        {% else %}
+          <p class="dim" style="margin:0">{{ t('cmp.no_bands') }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-2 section-gap">
+    {% for agg in [result.a, result.b] %}
+    <div class="card">
+      <div class="card-title">{{ agg.label }}</div>
+      {% if agg.bills %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>{{ t('hist.col_period') }}</th><th>{{ t('hist.col_provider') }}</th>
+            <th class="num">{{ t('hist.col_kwh') }}</th><th class="num">{{ t('hist.col_total') }}</th></tr></thead>
+          <tbody>
+            {% for b in agg.bills %}
+            <tr>
+              <td>{{ (b.billing_period_start or b.issue_date)|d('%d %b %Y') }}</td>
+              <td>{{ b.provider_name }}</td>
+              <td class="num">{{ b.total_kwh|num(1) }}</td>
+              <td class="num">{{ b.total_amount_cents|money(b.currency) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="dim">—</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+WattlyPage.compare({
+  labels: {{ [result.label_a, result.label_b] | tojson }},
+  kwh: {{ [result.a.kwh, result.b.kwh] | tojson }},
+  cost: {{ [result.a.cents / 100.0, result.b.cents / 100.0] | tojson }},
+  bandLabels: {{ (result.a.band_kwh.keys() | list) | tojson }},
+  bandA: {{ result.a.band_kwh.values() | list | tojson }},
+  bandB: {{ result.b.band_kwh.values() | list | tojson }}
+});
+</script>
+{% endif %}
+{% endblock %}

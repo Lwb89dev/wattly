@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Wattly
+GenericName=Electricity bill analytics
+Comment=Understand your energy — local-first electricity bill archive, trends and comparisons
+Exec=wattly
+Icon=wattly
+Terminal=false
+Type=Application
+Categories=Office;Finance;Utility;
+Keywords=bill;bolletta;energy;electricity;kwh;analytics;
+StartupWMClass=wattly

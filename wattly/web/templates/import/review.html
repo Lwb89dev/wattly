@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% import "macros.html" as ui with context %}
+{% block title %}{{ t('rev.title') }}{% endblock %}
+{% block page_title %}{{ t('rev.title') }}{% endblock %}
+{% block actions %}
+  {{ ui.badge(t('rev.extraction_pct', n=(confidence * 100)|round|int), 'ok' if confidence >= 0.75 else ('warn' if confidence >= 0.45 else 'error')) }}
+  {{ ui.badge(parse_method, 'info') }}
+  {% if doc %}
+    <a class="btn btn-sm" href="{{ url_for('import.raw', doc_id=doc.id) }}" target="_blank">{{ ui.icon('eye') }} {{ t('common.open') }} PDF</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+{% if bill %}
+  <div class="alert alert-info">{{ ui.icon('doc') }}<span>{{ t('rev.updating') }}
+    <a href="{{ url_for('bills.detail', bill_id=bill.id) }}">#{{ bill.id }}</a></span></div>
+{% endif %}
+{% for w in warnings %}
+  <div class="alert alert-warning">{{ ui.icon('alert') }}<span>{{ w }}</span></div>
+{% endfor %}
+{% if confidence < 0.75 %}
+  <div class="alert alert-warning">{{ ui.icon('alert') }}<span>{{ t('rev.low_confidence') }}</span></div>
+{% endif %}
+
+<form method="post" novalidate>
+  <div class="card">
+    <div class="card-title">{{ t('rev.bill_fields') }}
+      <span class="dim" style="text-transform:none;letter-spacing:0;font-weight:400">
+        {{ t('rev.legend') }}
+        <span class="conf conf-ok"></span> {{ t('rev.sure') }}
+        <span class="conf conf-warn"></span> {{ t('rev.uncertain') }}
+        <span class="conf conf-bad"></span> {{ t('rev.weak') }}
+      </span>
+    </div>
+    <div class="field-grid">
+      {{ ui.field(t('form.provider'), 'provider_name', v.provider_name, error=errors.get('provider_name'), confidence=confidences.get('provider_name'), placeholder=t('form.provider_ph')) }}
+      {{ ui.field(t('form.pod'), 'pod_identifier', v.pod_identifier, error=errors.get('pod_identifier'), confidence=confidences.get('pod_identifier')) }}
+      {{ ui.field(t('form.account'), 'account_number', v.account_number, error=errors.get('account_number'), confidence=confidences.get('account_number')) }}
+      {{ ui.field(t('form.period_start'), 'billing_period_start', v.billing_period_start, type='date', error=errors.get('billing_period_start'), confidence=confidences.get('billing_period_start')) }}
+      {{ ui.field(t('form.period_end'), 'billing_period_end', v.billing_period_end, type='date', error=errors.get('billing_period_end'), confidence=confidences.get('billing_period_end')) }}
+      {{ ui.field(t('form.issue_date'), 'issue_date', v.issue_date, type='date', error=errors.get('issue_date'), confidence=confidences.get('issue_date')) }}
+      {{ ui.field(t('form.tariff'), 'tariff_type', v.tariff_type, error=errors.get('tariff_type'), confidence=confidences.get('tariff_type'), placeholder=t('form.tariff_ph')) }}
+      <div class="field">
+        <label for="currency">{{ t('form.currency') }}</label>
+        <select id="currency" name="currency">
+          {% for c in ['EUR', 'USD', 'GBP', 'CHF'] %}
+            <option value="{{ c }}" {{ 'selected' if v.currency == c }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {{ ui.field(t('form.total_amount'), 'total_amount', v.total_amount, error=errors.get('total_amount'), confidence=confidences.get('total_amount_cents'), hint=t('form.total_amount_hint')) }}
+      {{ ui.field(t('form.total_kwh'), 'total_kwh', v.total_kwh, error=errors.get('total_kwh'), confidence=confidences.get('total_kwh'), placeholder=t('form.total_kwh_ph')) }}
+      {{ ui.field(t('form.energy'), 'energy_charges', v.energy_charges, error=errors.get('energy_charges'), confidence=confidences.get('energy_charges_cents'), hint=t('form.energy_hint')) }}
+      {{ ui.field(t('form.fixed'), 'fixed_charges', v.fixed_charges, error=errors.get('fixed_charges'), confidence=confidences.get('fixed_charges_cents')) }}
+      {{ ui.field(t('form.taxes'), 'taxes_and_fees', v.taxes_and_fees, error=errors.get('taxes_and_fees'), confidence=confidences.get('taxes_and_fees_cents')) }}
+      {{ ui.field(t('form.prev_reading'), 'previous_reading', v.previous_reading, error=errors.get('previous_reading'), confidence=confidences.get('previous_reading')) }}
+      {{ ui.field(t('form.curr_reading'), 'current_reading', v.current_reading, error=errors.get('current_reading'), confidence=confidences.get('current_reading')) }}
+      {{ ui.field(t('form.reading_start'), 'reading_start_date', v.reading_start_date, type='date', error=errors.get('reading_start_date'), confidence=confidences.get('reading_start_date')) }}
+      {{ ui.field(t('form.reading_end'), 'reading_end_date', v.reading_end_date, type='date', error=errors.get('reading_end_date'), confidence=confidences.get('reading_end_date')) }}
+    </div>
+
+    <div class="section-gap">{{ ui.band_editor(v.bands, t) }}</div>
+
+    <div class="field-grid section-gap">
+      <div class="field span-12">
+        <label for="notes">{{ t('form.notes') }}</label>
+        <textarea id="notes" name="notes" rows="2" placeholder="{{ t('form.notes_ph') }}">{{ v.notes }}</textarea>
+      </div>
+    </div>
+
+    <div class="section-gap flex-between">
+      <a class="btn btn-ghost" href="{{ url_for('import.index') }}">{{ t('common.discard') }}</a>
+      <button class="btn btn-primary" type="submit">{{ ui.icon('check') }}
+        {% if bill %}{{ t('rev.save_update') }}{% else %}{{ t('rev.save_archive') }}{% endif %}
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

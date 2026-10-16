@@ -63,14 +63,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 \
             libgtk-3-0t64 libwebkit2gtk-4.1-0 \
+            libglib2.0-dev libgirepository1.0-dev libcairo2-dev \
+            gir1.2-gtk-3.0 gir1.2-webkit2-4.1 \
             xvfb
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          pip install -r requirements.txt pyinstaller pycairo PyGObject
 
       - name: Freeze standalone binary
         run: >

@@ -15,7 +15,7 @@ source.exclude_patterns = *.pyc, *.pyo, *.db, *.pdf, *.spec, *.md, *.log
 
 version = 1.0.0
 
-requirements = python3, flask, sqlalchemy, pillow, openpyxl, pdfplumber, waitress, platformdirs
+requirements = python3, flask, sqlalchemy, pillow, openpyxl, pdfplumber, pdfminer.six, charset-normalizer, et-xmlfile, six, waitress, platformdirs
 
 orientation = landscape
 fullscreen = 0

@@ -31,6 +31,7 @@ p4a.hook = %(source.dir)s/packaging/android/p4a_hook.py
 #
 
 android.accept_sdk_license = True
+android.release_artifact = apk
 
 android.permissions = INTERNET
 android.api = 34

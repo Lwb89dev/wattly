@@ -15,7 +15,7 @@ source.exclude_patterns = *.pyc, *.pyo, *.db, *.pdf, *.spec, *.md, *.log
 
 version = 1.0.0
 
-requirements = python3, flask, sqlalchemy, pillow, openpyxl, pdfplumber, pdfminer.six, charset-normalizer, et-xmlfile, six, waitress, platformdirs
+requirements = python3, flask, sqlalchemy, pillow, openpyxl, pdfplumber, pdfminer.six, charset-normalizer, et-xmlfile, six, waitress, platformdirs, typing_extensions, cryptography, cffi, pycparser
 
 orientation = landscape
 fullscreen = 0
@@ -25,6 +25,7 @@ icon.filename = %(source.dir)s/wattly/assets/icons/icon.png
 p4a.bootstrap = webview
 p4a.port = 5055
 p4a.hook = %(source.dir)s/packaging/android/p4a_hook.py
+p4a.local_recipes = %(source.dir)s/packaging/android/recipes
 
 #
 # Android specific
@@ -36,6 +37,7 @@ android.release_artifact = apk
 android.permissions = INTERNET
 android.api = 34
 android.minapi = 24
+android.archs = arm64-v8a
 
 [buildozer]
 
